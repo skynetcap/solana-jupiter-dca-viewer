@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { FixedSizeList as List } from 'react-window';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
@@ -6,7 +6,9 @@ import debounce from 'lodash.debounce';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
-// Assuming these types based on potential API response
+/**
+ * Represents a DCA (Dollar Cost Averaging) order.
+ */
 type DCAOrder = {
   id: string;
   user: string;
@@ -17,6 +19,9 @@ type DCAOrder = {
   createdAt: string;
 };
 
+/**
+ * Represents the structure of chart data.
+ */
 type ChartData = {
   labels: string[];
   datasets: {
@@ -27,20 +32,35 @@ type ChartData = {
   }[];
 };
 
+/**
+ * Fetches DCA orders based on the provided filters.
+ * @param filters - The filters to apply when fetching orders.
+ * @returns A Promise that resolves to an array of DCAOrder objects.
+ */
 const fetchDCAOrders = async (filters: any): Promise<DCAOrder[]> => {
   // Simulated API call
   await new Promise(resolve => setTimeout(resolve, 500));
-  return Array(1000).fill(null).map((_, index) => ({
-    id: `order-${index}`,
-    user: `user-${Math.floor(Math.random() * 100)}`,
-    inputMint: ['SOL', 'USDC', 'ETH'][Math.floor(Math.random() * 3)],
-    outputMint: ['BTC', 'USDT', 'RAY'][Math.floor(Math.random() * 3)],
-    amount: Math.random() * 10000,
-    frequency: ['daily', 'weekly', 'monthly'][Math.floor(Math.random() * 3)],
-    createdAt: new Date(Date.now() - Math.random() * 10000000000).toISOString(),
-  }));
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - 100); // Start from 100 days ago
+
+  return Array(1000).fill(null).map((_, index) => {
+    const orderDate = new Date(startDate);
+    orderDate.setDate(orderDate.getDate() + index);
+    return {
+      id: `order-${index}`,
+      user: `user-${Math.floor(Math.random() * 100)}`,
+      inputMint: ['SOL', 'USDC', 'ETH'][Math.floor(Math.random() * 3)],
+      outputMint: ['BTC', 'USDT', 'RAY'][Math.floor(Math.random() * 3)],
+      amount: Math.random() * 10000,
+      frequency: ['daily', 'weekly', 'monthly'][Math.floor(Math.random() * 3)],
+      createdAt: orderDate.toISOString(),
+    };
+  });
 };
 
+/**
+ * JupiterDCAViewer component for displaying and managing DCA orders.
+ */
 export default function JupiterDCAViewer() {
   const [orders, setOrders] = useState<DCAOrder[]>([]);
   const [filters, setFilters] = useState({
@@ -49,24 +69,32 @@ export default function JupiterDCAViewer() {
     outputMint: '',
     user: '',
   });
-  const [sortConfig, setSortConfig] = useState<{ key: keyof DCAOrder; direction: 'asc' | 'desc' }>({ key: 'amount', direction: 'desc' });
+  const [sortConfig, setSortConfig] = useState<{ key: keyof DCAOrder; direction: 'asc' | 'desc' }>({ key: 'createdAt', direction: 'desc' });
 
-  const debouncedFetchOrders = useMemo(
-    () => debounce((filters) => {
-      fetchDCAOrders(filters).then(setOrders);
-    }, 300),
-    []
-  );
+  const [inputMints, setInputMints] = useState<string[]>([]);
+  const [outputMints, setOutputMints] = useState<string[]>([]);
+
+  const fetchOrders = useCallback(async () => {
+    const fetchedOrders = await fetchDCAOrders(filters);
+    setOrders(fetchedOrders);
+  }, []);
 
   useEffect(() => {
-    debouncedFetchOrders(filters);
-  }, [filters, debouncedFetchOrders]);
+    fetchOrders();
+  }, [fetchOrders]);
+
+  useEffect(() => {
+    const uniqueInputMints = Array.from(new Set(orders.map(order => order.inputMint)));
+    const uniqueOutputMints = Array.from(new Set(orders.map(order => order.outputMint)));
+    setInputMints(uniqueInputMints);
+    setOutputMints(uniqueOutputMints);
+  }, [orders]);
 
   const filteredOrders = useMemo(() => {
     return orders.filter(order => 
       order.user.toLowerCase().includes(filters.user.toLowerCase()) &&
-      order.inputMint.toLowerCase().includes(filters.inputMint.toLowerCase()) &&
-      order.outputMint.toLowerCase().includes(filters.outputMint.toLowerCase()) &&
+      (filters.inputMint === '' || order.inputMint === filters.inputMint) &&
+      (filters.outputMint === '' || order.outputMint === filters.outputMint) &&
       (order.user.toLowerCase().includes(filters.search.toLowerCase()) ||
        order.inputMint.toLowerCase().includes(filters.search.toLowerCase()) ||
        order.outputMint.toLowerCase().includes(filters.search.toLowerCase()))
@@ -85,7 +113,7 @@ export default function JupiterDCAViewer() {
   };
 
   const chartData: ChartData = {
-    labels: filteredOrders.slice(0, 50).map(order => order.createdAt.split('T')[0]),
+    labels: filteredOrders.slice(0, 50).map(order => new Date(order.createdAt).toLocaleDateString()),
     datasets: [{
       label: 'Order Amount',
       data: filteredOrders.slice(0, 50).map(order => order.amount),
@@ -140,18 +168,26 @@ export default function JupiterDCAViewer() {
           className="bg-gray-800 text-white p-2 rounded"
           onChange={e => setFilters(prev => ({ ...prev, search: e.target.value }))}
         />
-        <input
-          type="text"
-          placeholder="Filter by Input Mint"
+        <select
           className="bg-gray-800 text-white p-2 rounded"
           onChange={e => setFilters(prev => ({ ...prev, inputMint: e.target.value }))}
-        />
-        <input
-          type="text"
-          placeholder="Filter by Output Mint"
+          value={filters.inputMint}
+        >
+          <option value="">All Input Mints</option>
+          {inputMints.map(mint => (
+            <option key={mint} value={mint}>{mint}</option>
+          ))}
+        </select>
+        <select
           className="bg-gray-800 text-white p-2 rounded"
           onChange={e => setFilters(prev => ({ ...prev, outputMint: e.target.value }))}
-        />
+          value={filters.outputMint}
+        >
+          <option value="">All Output Mints</option>
+          {outputMints.map(mint => (
+            <option key={mint} value={mint}>{mint}</option>
+          ))}
+        </select>
         <input
           type="text"
           placeholder="Filter by User"
