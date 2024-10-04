@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import '~antd/dist/reset.css';
+
+/* Custom global styles can go here */
 
 body {
   margin: 0;

@@ -8,6 +8,7 @@
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
     "@types/react-window": "^1.8.5",
+    "antd": "^5.8.6",
     "chart.js": "^4.3.0",
     "lodash.debounce": "^4.0.8",
     "react": "^18.2.0",
@@ -15,7 +16,6 @@
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
     "react-window": "^1.8.9",
-    "solana-jupiter-dca-viewer": "file:",
     "tailwindcss": "^3.4.13",
     "typescript": "^5.0.0"
   },
