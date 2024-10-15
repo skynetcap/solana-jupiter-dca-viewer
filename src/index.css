@@ -1,7 +1,6 @@
 @import '~antd/dist/reset.css';
 
-/* Custom global styles can go here */
-
+/* Custom global styles */
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -9,6 +8,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(to bottom right, #121212, #1e1e1e); /* Updated background */
+  color: #e0e0e0;
 }
 
 code {

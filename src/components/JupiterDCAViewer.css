@@ -1,0 +1,98 @@
+.dca-viewer-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  color: #e0e0e0;
+}
+
+.header-card,
+.filter-card,
+.chart-card,
+.tabs-card {
+  margin-bottom: 2rem;
+  background-color: #1e1e1e;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.dca-viewer-header {
+  text-align: center;
+  margin-bottom: 0 !important;
+}
+
+.chart-container {
+  height: 300px;
+  width: 100%;
+}
+
+.custom-tabs .ant-tabs-nav {
+  margin-bottom: 1rem;
+}
+
+.custom-tabs .ant-tabs-tab {
+  background-color: #2c2c2c;
+  border-color: #333;
+  border-radius: 8px 8px 0 0;
+}
+
+.custom-tabs .ant-tabs-tab-active {
+  background-color: #4caf50;
+}
+
+.custom-tabs .ant-tabs-content-holder {
+  background-color: #1e1e1e;
+  border-radius: 0 0 8px 8px;
+}
+
+.ant-table {
+  background-color: #1e1e1e;
+}
+
+.ant-table-thead > tr > th {
+  background-color: #2c2c2c;
+  color: #e0e0e0;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid #333;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background-color: #2c2c2c;
+}
+
+.ant-pagination-item {
+  background-color: #1e1e1e;
+  border-color: #333;
+}
+
+.ant-pagination-item-active {
+  background-color: #4caf50;
+  border-color: #4caf50;
+}
+
+/* Remove or comment out these lines */
+/*
+.ant-select-selector,
+.ant-input {
+  background-color: #2c2c2c !important;
+  color: #e0e0e0 !important;
+  border-color: #333 !important;
+}
+
+.ant-select-arrow,
+.ant-select-selection-item {
+  color: #e0e0e0 !important;
+}
+*/
+
+/* Add this line to ensure inputs follow the Ant Design theme */
+.ant-input-affix-wrapper {
+  background-color: transparent;
+}
+
+@media (max-width: 768px) {
+  .dca-viewer-container {
+    padding: 1rem;
+  }
+}

@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import 'antd/dist/reset.css'; // Updated import path for Ant Design v5
+import 'antd/dist/reset.css'; // Updated for Ant Design v5
 import './index.css';
 import App from './App';
 
