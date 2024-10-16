@@ -9,12 +9,23 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-import { Tabs, Input, Select, Table, ConfigProvider, theme, Typography, Card, Row, Col } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import {
+  Tabs,
+  Input,
+  Select,
+  Table,
+  ConfigProvider,
+  theme,
+  Typography,
+  Card,
+  Row,
+  Col,
+} from 'antd';
+import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
 import type { SortOrder } from 'antd/es/table/interface';
+import type { TabsProps } from 'antd'; // Ensure TabsProps is imported
 import debounce from 'lodash.debounce';
 import './JupiterDCAViewer.css';
-import type { TabsProps } from 'antd';
 
 /**
  * Represents a DCA (Dollar Cost Averaging) order.
@@ -62,9 +73,8 @@ const { Option } = Select;
  */
 const fetchDCAOrders = async (filters: any): Promise<DCAOrder[]> => {
   // Simulated API call
-  await new Promise(resolve => setTimeout(resolve, 0));
+  // await new Promise(resolve => setTimeout(resolve, 500));
   const now = new Date();
-  console.log("GETDCAORDERS", filters);
 
   return Array(100)
     .fill(null)
@@ -115,9 +125,54 @@ export default function JupiterDCAViewer() {
   const [inputMints, setInputMints] = useState<string[]>([]);
   const [outputMints, setOutputMints] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'Next Hour' | 'Next Day' | 'All'>('Next Hour');
+  const [aggregateChartData, setAggregateChartData] = useState<ChartDataType>({
+    labels: [],
+    datasets: [],
+  });
 
   const hasFetched = useRef(false);
 
+  /**
+   * Fetches aggregate USDC value for chart data.
+   * @param orders - The array of DCAOrder objects.
+   * @returns A Promise that resolves to ChartDataType.
+   */
+  const fetchAggregateUSDCValue = useCallback(async (orders: DCAOrder[]): Promise<ChartDataType> => {
+    const now = new Date();
+    const past24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const labels = Array.from({ length: 24 }, (_, i) => {
+      const date = new Date(past24Hours);
+      date.setHours(date.getHours() + i);
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    });
+
+    const data = labels.map((_, index) => {
+      const hourStart = new Date(past24Hours);
+      hourStart.setHours(hourStart.getHours() + index);
+      const hourEnd = new Date(hourStart);
+      hourEnd.setHours(hourEnd.getHours() + 1);
+
+      return orders
+        .filter(order => {
+          const executeAt = new Date(order.executeAt);
+          return executeAt >= hourStart && executeAt < hourEnd && order.inputMint === 'USDC';
+        })
+        .reduce((sum, order) => sum + order.amount, 0);
+    });
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Aggregate USDC Value',
+          data,
+          borderColor: 'rgb(75, 192, 192)',
+          backgroundColor: 'rgba(75, 192, 192, 0.5)',
+        },
+      ],
+    };
+  }, []);
 
   /**
    * Fetches DCA orders and sets the state.
@@ -142,47 +197,52 @@ export default function JupiterDCAViewer() {
   }, [orders]);
 
   /**
-   * Filters and sorts orders based on active tab and sort configuration.
+   * Filters and sorts orders based on sort configuration.
+   * @param tabKey - The key of the current tab.
+   * @returns The filtered and sorted array of DCAOrder objects for the specified tab.
    */
-  const filteredOrders = useMemo(() => {
-    const now = new Date();
-    let relevantOrders = orders.filter(order => {
-      const executeTime = new Date(order.executeAt);
-      if (activeTab === 'Next Hour') {
-        return executeTime > now && executeTime <= new Date(now.getTime() + 60 * 60 * 1000);
-      } else if (activeTab === 'Next Day') {
-        return executeTime > now && executeTime <= new Date(now.getTime() + 24 * 60 * 60 * 1000);
-      } else {
-        return true; // All active orders
-      }
-    });
-
-    return relevantOrders
-      .filter(order =>
-        order.user.toLowerCase().includes(filters.user.toLowerCase()) &&
-        (filters.inputMint === '' || order.inputMint === filters.inputMint) &&
-        (filters.outputMint === '' || order.outputMint === filters.outputMint) &&
-        (order.user.toLowerCase().includes(filters.search.toLowerCase()) ||
-          order.inputMint.toLowerCase().includes(filters.search.toLowerCase()) ||
-          order.outputMint.toLowerCase().includes(filters.search.toLowerCase()))
-      )
-      .sort((a, b) => {
-        if (sortConfig.key === 'tokenPair') {
-          const pairA = `${a.outputMint}-${a.inputMint}`;
-          const pairB = `${b.outputMint}-${b.inputMint}`;
-          return sortConfig.direction === 'ascend'
-            ? pairA.localeCompare(pairB)
-            : pairB.localeCompare(pairA);
+  const getFilteredOrders = useCallback(
+    (tabKey: 'Next Hour' | 'Next Day' | 'All'): DCAOrder[] => {
+      const now = new Date();
+      let relevantOrders = orders.filter(order => {
+        const executeTime = new Date(order.executeAt);
+        if (tabKey === 'Next Hour') {
+          return executeTime > now && executeTime <= new Date(now.getTime() + 60 * 60 * 1000);
+        } else if (tabKey === 'Next Day') {
+          return executeTime > now && executeTime <= new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        } else {
+          return true; // All active orders
         }
-        if (sortConfig.direction === 'ascend') {
-          return a[sortConfig.key] < b[sortConfig.key] ? -1 : 1;
-        }
-        if (sortConfig.direction === 'descend') {
-          return a[sortConfig.key] > b[sortConfig.key] ? -1 : 1;
-        }
-        return 0;
       });
-  }, [orders, filters, sortConfig, activeTab]);
+
+      return relevantOrders
+        .filter(order =>
+          order.user.toLowerCase().includes(filters.user.toLowerCase()) &&
+          (filters.inputMint === '' || order.inputMint === filters.inputMint) &&
+          (filters.outputMint === '' || order.outputMint === filters.outputMint) &&
+          (order.user.toLowerCase().includes(filters.search.toLowerCase()) ||
+            order.inputMint.toLowerCase().includes(filters.search.toLowerCase()) ||
+            order.outputMint.toLowerCase().includes(filters.search.toLowerCase()))
+        )
+        .sort((a, b) => {
+          if (sortConfig.key === 'tokenPair') {
+            const pairA = `${a.outputMint}-${a.inputMint}`;
+            const pairB = `${b.outputMint}-${b.inputMint}`;
+            return sortConfig.direction === 'ascend'
+              ? pairA.localeCompare(pairB)
+              : pairB.localeCompare(pairA);
+          }
+          if (sortConfig.direction === 'ascend') {
+            return a[sortConfig.key] < b[sortConfig.key] ? -1 : 1;
+          }
+          if (sortConfig.direction === 'descend') {
+            return a[sortConfig.key] > b[sortConfig.key] ? -1 : 1;
+          }
+          return 0;
+        });
+    },
+    [orders, filters, sortConfig]
+  );
 
   /**
    * Memoized debounced filter change handler to prevent multiple state updates.
@@ -200,6 +260,85 @@ export default function JupiterDCAViewer() {
       handleFilterChange.cancel();
     };
   }, [handleFilterChange]);
+
+  /**
+   * Manages pagination state.
+   */
+  const [pagination, setPagination] = useState<TablePaginationConfig>({
+    current: 1,
+    pageSize: 10,
+    showSizeChanger: true,
+    pageSizeOptions: ['5', '10', '20', '50'],
+  });
+
+  /**
+   * Handles pagination and sorting changes.
+   * @param newPagination - The new pagination configuration.
+   * @param _ - The filter parameters (unused).
+   * @param sorter - The sorter object containing sorting information.
+   */
+  const handleTableChange = useCallback(
+    (newPagination: TablePaginationConfig, _: any, sorter: any) => {
+      setPagination(newPagination);
+      if (sorter.order) {
+        setSortConfig({
+          key: sorter.field,
+          direction: sorter.order,
+        });
+      } else {
+        setSortConfig({
+          key: 'amount',
+          direction: 'descend',
+        });
+      }
+    },
+    []
+  );
+
+  /**
+   * Sets up the aggregate volume chart with periodic updates.
+   */
+  useEffect(() => {
+    const loadAggregateData = async () => {
+      const data = await fetchAggregateUSDCValue(orders);
+      setAggregateChartData(data);
+    };
+
+    loadAggregateData();
+    const interval = setInterval(loadAggregateData, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, [orders, fetchAggregateUSDCValue]);
+
+  const chartOptions = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)',
+        },
+        ticks: {
+          color: '#e0e0e0',
+        },
+      },
+      y: {
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)',
+        },
+        ticks: {
+          color: '#e0e0e0',
+        },
+      },
+    },
+    plugins: {
+      legend: {
+        labels: {
+          color: '#e0e0e0',
+        },
+      },
+    },
+  }), []);
 
   /**
    * Defines the columns for the Ant Design Table.
@@ -255,6 +394,9 @@ export default function JupiterDCAViewer() {
     [sortConfig]
   );
 
+  /**
+   * Defines the tab items for the Ant Design Tabs component.
+   */
   const tabItems: TabsProps['items'] = useMemo(
     () => [
       {
@@ -266,10 +408,11 @@ export default function JupiterDCAViewer() {
            */
           <Table
             columns={columns}
-            dataSource={filteredOrders}
-            pagination={{ pageSize: 5 }}
+            dataSource={getFilteredOrders('Next Hour')}
+            pagination={pagination}
+            onChange={handleTableChange}
             rowKey="id"
-            scroll={filteredOrders.length > 0 ? { x: 'max-content' } : undefined}
+            scroll={getFilteredOrders('Next Hour').length > 0 ? { x: 'max-content' } : undefined}
           />
         ),
       },
@@ -282,10 +425,11 @@ export default function JupiterDCAViewer() {
            */
           <Table
             columns={columns}
-            dataSource={filteredOrders}
-            pagination={{ pageSize: 5 }}
+            dataSource={getFilteredOrders('Next Day')}
+            pagination={pagination}
+            onChange={handleTableChange}
             rowKey="id"
-            scroll={filteredOrders.length > 0 ? { x: 'max-content' } : undefined}
+            scroll={getFilteredOrders('Next Day').length > 0 ? { x: 'max-content' } : undefined}
           />
         ),
       },
@@ -298,15 +442,16 @@ export default function JupiterDCAViewer() {
            */
           <Table
             columns={columns}
-            dataSource={filteredOrders}
-            pagination={{ pageSize: 5 }}
+            dataSource={getFilteredOrders('All')}
+            pagination={pagination}
+            onChange={handleTableChange}
             rowKey="id"
-            scroll={filteredOrders.length > 0 ? { x: 'max-content' } : undefined}
+            scroll={getFilteredOrders('All').length > 0 ? { x: 'max-content' } : undefined}
           />
         ),
       },
     ],
-    [columns, filteredOrders]
+    [columns, pagination, handleTableChange, getFilteredOrders]
   );
 
   return (
