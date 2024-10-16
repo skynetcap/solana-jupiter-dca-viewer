@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -10,11 +9,12 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-import { Tabs, Input, Select, Table, Space, ConfigProvider, theme, Typography, Card, Row, Col } from 'antd';
+import { Tabs, Input, Select, Table, ConfigProvider, theme, Typography, Card, Row, Col } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { SortOrder } from 'antd/es/table/interface';
 import debounce from 'lodash.debounce';
 import './JupiterDCAViewer.css';
+import type { TabsProps } from 'antd';
 
 /**
  * Represents a DCA (Dollar Cost Averaging) order.
@@ -53,7 +53,6 @@ type SortConfig = {
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
-const { TabPane } = Tabs;
 const { Option } = Select;
 
 /**
@@ -63,7 +62,7 @@ const { Option } = Select;
  */
 const fetchDCAOrders = async (filters: any): Promise<DCAOrder[]> => {
   // Simulated API call
-  await new Promise(resolve => setTimeout(resolve, 500));
+  await new Promise(resolve => setTimeout(resolve, 0));
   const now = new Date();
   console.log("GETDCAORDERS", filters);
 
@@ -116,49 +115,8 @@ export default function JupiterDCAViewer() {
   const [inputMints, setInputMints] = useState<string[]>([]);
   const [outputMints, setOutputMints] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'Next Hour' | 'Next Day' | 'All'>('Next Hour');
-  const [aggregateChartData, setAggregateChartData] = useState<ChartDataType>({
-    labels: [],
-    datasets: [],
-  });
 
   const hasFetched = useRef(false);
-
-  const fetchAggregateUSDCValue = useCallback(async (orders: DCAOrder[]): Promise<ChartDataType> => {
-    const now = new Date();
-    const past24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-    const labels = Array.from({ length: 24 }, (_, i) => {
-      const date = new Date(past24Hours);
-      date.setHours(date.getHours() + i);
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    });
-
-    const data = labels.map((_, index) => {
-      const hourStart = new Date(past24Hours);
-      hourStart.setHours(hourStart.getHours() + index);
-      const hourEnd = new Date(hourStart);
-      hourEnd.setHours(hourEnd.getHours() + 1);
-
-      return orders
-        .filter(order => {
-          const executeAt = new Date(order.executeAt);
-          return executeAt >= hourStart && executeAt < hourEnd && order.inputMint === 'USDC';
-        })
-        .reduce((sum, order) => sum + order.amount, 0);
-    });
-
-    return {
-      labels,
-      datasets: [
-        {
-          label: 'Aggregate USDC Value',
-          data,
-          borderColor: 'rgb(75, 192, 192)',
-          backgroundColor: 'rgba(75, 192, 192, 0.5)',
-        },
-      ],
-    };
-  }, []);
 
   /**
    * Fetches DCA orders and sets the state.
@@ -243,51 +201,6 @@ export default function JupiterDCAViewer() {
   }, [handleFilterChange]);
 
   /**
-   * Sets up the aggregate volume chart with periodic updates.
-   */
-  useEffect(() => {
-    const loadAggregateData = async () => {
-      const data = await fetchAggregateUSDCValue(orders);
-      setAggregateChartData(data);
-    };
-
-    loadAggregateData();
-    const interval = setInterval(loadAggregateData, 60000); // Update every minute
-
-    return () => clearInterval(interval);
-  }, [orders, fetchAggregateUSDCValue]);
-
-  const chartOptions = useMemo(() => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      x: {
-        grid: {
-          color: 'rgba(255, 255, 255, 0.1)',
-        },
-        ticks: {
-          color: '#e0e0e0',
-        },
-      },
-      y: {
-        grid: {
-          color: 'rgba(255, 255, 255, 0.1)',
-        },
-        ticks: {
-          color: '#e0e0e0',
-        },
-      },
-    },
-    plugins: {
-      legend: {
-        labels: {
-          color: '#e0e0e0',
-        },
-      },
-    },
-  }), []);
-
-  /**
    * Defines the columns for the Ant Design Table.
    */
   const columns: ColumnsType<DCAOrder> = useMemo(
@@ -340,6 +253,48 @@ export default function JupiterDCAViewer() {
     ],
     [sortConfig]
   );
+
+  const tabItems: TabsProps['items'] = [
+    {
+      key: 'Next Hour',
+      label: 'Next Hour',
+      children: (
+        <Table
+          columns={columns}
+          dataSource={filteredOrders}
+          pagination={{ pageSize: 5 }}
+          rowKey="id"
+          scroll={{ x: 'max-content' }}
+        />
+      ),
+    },
+    {
+      key: 'Next Day',
+      label: 'Next Day',
+      children: (
+        <Table
+          columns={columns}
+          dataSource={filteredOrders}
+          pagination={{ pageSize: 5 }}
+          rowKey="id"
+          scroll={{ x: 'max-content' }}
+        />
+      ),
+    },
+    {
+      key: 'All',
+      label: 'All',
+      children: (
+        <Table
+          columns={columns}
+          dataSource={filteredOrders}
+          pagination={{ pageSize: 5 }}
+          rowKey="id"
+          scroll={{ x: 'max-content' }}
+        />
+      ),
+    },
+  ];
 
   return (
     <ConfigProvider
@@ -400,38 +355,11 @@ export default function JupiterDCAViewer() {
         <Card className="tabs-card">
           <Tabs
             activeKey={activeTab}
-            onChange={key => setActiveTab(key as 'Next Hour' | 'Next Day' | 'All')}
+            onChange={(key) => setActiveTab(key as 'Next Hour' | 'Next Day' | 'All')}
             type="card"
             className="custom-tabs"
-          >
-            <TabPane tab="Next Hour" key="Next Hour">
-              <Table
-                columns={columns}
-                dataSource={filteredOrders}
-                pagination={{ pageSize: 5 }}
-                rowKey="id"
-                scroll={{ x: 'max-content' }}
-              />
-            </TabPane>
-            <TabPane tab="Next Day" key="Next Day">
-              <Table
-                columns={columns}
-                dataSource={filteredOrders}
-                pagination={{ pageSize: 5 }}
-                rowKey="id"
-                scroll={{ x: 'max-content' }}
-              />
-            </TabPane>
-            <TabPane tab="All" key="All">
-              <Table
-                columns={columns}
-                dataSource={filteredOrders}
-                pagination={{ pageSize: 5 }}
-                rowKey="id"
-                scroll={{ x: 'max-content' }}
-              />
-            </TabPane>
-          </Tabs>
+            items={tabItems}
+          />
         </Card>
       </div>
     </ConfigProvider>
