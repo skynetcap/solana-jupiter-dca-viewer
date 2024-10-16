@@ -118,6 +118,7 @@ export default function JupiterDCAViewer() {
 
   const hasFetched = useRef(false);
 
+
   /**
    * Fetches DCA orders and sets the state.
    */
@@ -254,47 +255,59 @@ export default function JupiterDCAViewer() {
     [sortConfig]
   );
 
-  const tabItems: TabsProps['items'] = [
-    {
-      key: 'Next Hour',
-      label: 'Next Hour',
-      children: (
-        <Table
-          columns={columns}
-          dataSource={filteredOrders}
-          pagination={{ pageSize: 5 }}
-          rowKey="id"
-          scroll={{ x: 'max-content' }}
-        />
-      ),
-    },
-    {
-      key: 'Next Day',
-      label: 'Next Day',
-      children: (
-        <Table
-          columns={columns}
-          dataSource={filteredOrders}
-          pagination={{ pageSize: 5 }}
-          rowKey="id"
-          scroll={{ x: 'max-content' }}
-        />
-      ),
-    },
-    {
-      key: 'All',
-      label: 'All',
-      children: (
-        <Table
-          columns={columns}
-          dataSource={filteredOrders}
-          pagination={{ pageSize: 5 }}
-          rowKey="id"
-          scroll={{ x: 'max-content' }}
-        />
-      ),
-    },
-  ];
+  const tabItems: TabsProps['items'] = useMemo(
+    () => [
+      {
+        key: 'Next Hour',
+        label: 'Next Hour',
+        children: (
+          /**
+           * Renders the Table for the "Next Hour" tab.
+           */
+          <Table
+            columns={columns}
+            dataSource={filteredOrders}
+            pagination={{ pageSize: 5 }}
+            rowKey="id"
+            scroll={filteredOrders.length > 0 ? { x: 'max-content' } : undefined}
+          />
+        ),
+      },
+      {
+        key: 'Next Day',
+        label: 'Next Day',
+        children: (
+          /**
+           * Renders the Table for the "Next Day" tab.
+           */
+          <Table
+            columns={columns}
+            dataSource={filteredOrders}
+            pagination={{ pageSize: 5 }}
+            rowKey="id"
+            scroll={filteredOrders.length > 0 ? { x: 'max-content' } : undefined}
+          />
+        ),
+      },
+      {
+        key: 'All',
+        label: 'All',
+        children: (
+          /**
+           * Renders the Table for the "All" tab.
+           */
+          <Table
+            columns={columns}
+            dataSource={filteredOrders}
+            pagination={{ pageSize: 5 }}
+            rowKey="id"
+            scroll={filteredOrders.length > 0 ? { x: 'max-content' } : undefined}
+          />
+        ),
+      },
+    ],
+    [columns, filteredOrders]
+  );
 
   return (
     <ConfigProvider
