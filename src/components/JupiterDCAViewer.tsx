@@ -23,13 +23,10 @@ import {
 } from 'antd';
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
 import type { SortOrder } from 'antd/es/table/interface';
-import type { TabsProps } from 'antd'; // Ensure TabsProps is imported
+import type { TabsProps } from 'antd';
 import debounce from 'lodash.debounce';
 import './JupiterDCAViewer.css';
 
-/**
- * Represents a DCA (Dollar Cost Averaging) order.
- */
 type DCAOrder = {
   id: string;
   user: string;
@@ -41,9 +38,6 @@ type DCAOrder = {
   executeAt: string;
 };
 
-/**
- * Represents the structure of chart data.
- */
 type ChartDataType = {
   labels: string[];
   datasets: {
@@ -54,11 +48,8 @@ type ChartDataType = {
   }[];
 };
 
-/**
- * Represents the sorting configuration.
- */
 type SortConfig = {
-  key: keyof DCAOrder | 'tokenPair'; // Include 'tokenPair' as a valid key
+  key: keyof DCAOrder | 'tokenPair';
   direction: SortOrder;
 };
 
@@ -72,8 +63,6 @@ const { Option } = Select;
  * @returns A Promise that resolves to an array of DCAOrder objects.
  */
 const fetchDCAOrders = async (filters: any): Promise<DCAOrder[]> => {
-  // Simulated API call
-  // await new Promise(resolve => setTimeout(resolve, 500));
   const now = new Date();
 
   return Array(100)
@@ -83,11 +72,11 @@ const fetchDCAOrders = async (filters: any): Promise<DCAOrder[]> => {
       const isNextDay = index % 3 === 1;
       const orderDate = new Date(now);
       if (isNextHour) {
-        orderDate.setHours(orderDate.getHours() + 1); // Within next hour
+        orderDate.setHours(orderDate.getHours() + 1);
       } else if (isNextDay) {
-        orderDate.setHours(orderDate.getHours() + 24); // Within next day
+        orderDate.setHours(orderDate.getHours() + 24);
       } else {
-        orderDate.setHours(orderDate.getHours() + 48); // Beyond next day
+        orderDate.setHours(orderDate.getHours() + 48);
       }
 
       const executeDate = new Date(orderDate);
@@ -211,7 +200,7 @@ export default function JupiterDCAViewer() {
         } else if (tabKey === 'Next Day') {
           return executeTime > now && executeTime <= new Date(now.getTime() + 24 * 60 * 60 * 1000);
         } else {
-          return true; // All active orders
+          return true;
         }
       });
 
@@ -305,7 +294,7 @@ export default function JupiterDCAViewer() {
     };
 
     loadAggregateData();
-    const interval = setInterval(loadAggregateData, 60000); // Update every minute
+    const interval = setInterval(loadAggregateData, 60000);
 
     return () => clearInterval(interval);
   }, [orders, fetchAggregateUSDCValue]);
@@ -403,9 +392,6 @@ export default function JupiterDCAViewer() {
         key: 'Next Hour',
         label: 'Next Hour',
         children: (
-          /**
-           * Renders the Table for the "Next Hour" tab.
-           */
           <Table
             columns={columns}
             dataSource={getFilteredOrders('Next Hour')}
@@ -420,9 +406,6 @@ export default function JupiterDCAViewer() {
         key: 'Next Day',
         label: 'Next Day',
         children: (
-          /**
-           * Renders the Table for the "Next Day" tab.
-           */
           <Table
             columns={columns}
             dataSource={getFilteredOrders('Next Day')}
@@ -437,9 +420,6 @@ export default function JupiterDCAViewer() {
         key: 'All',
         label: 'All',
         children: (
-          /**
-           * Renders the Table for the "All" tab.
-           */
           <Table
             columns={columns}
             dataSource={getFilteredOrders('All')}
@@ -472,52 +452,58 @@ export default function JupiterDCAViewer() {
           </Typography.Title>
         </Card>
 
-        <Card className="filter-card">
-          <Row gutter={[16, 16]}>
-            <Col xs={24} sm={24} md={24} lg={8} xl={8}>
-              <Input
-                placeholder="Search..."
-                onChange={e => handleFilterChange(e.target.value, 'search')}
-                allowClear
+        <Card className="tabs-card">
+          <Row gutter={[16, 16]} align="middle">
+            <Col span={24}>
+              <Tabs
+                activeKey={activeTab}
+                onChange={(key) => setActiveTab(key as 'Next Hour' | 'Next Day' | 'All')}
+                type="card"
+                className="custom-tabs"
+                tabBarExtraContent={{
+                  right: (
+                    <Row gutter={[16, 16]}>
+                      <Col>
+                        <Input
+                          placeholder="Search..."
+                          onChange={e => handleFilterChange(e.target.value, 'search')}
+                          allowClear
+                          style={{ width: 200 }}
+                        />
+                      </Col>
+                      <Col>
+                        <Select
+                          placeholder="All Input Mints"
+                          onChange={value => handleFilterChange(value, 'inputMint')}
+                          style={{ width: 150 }}
+                          allowClear
+                        >
+                          <Option value="">All Input Mints</Option>
+                          {inputMints.map(mint => (
+                            <Option key={mint} value={mint}>{mint}</Option>
+                          ))}
+                        </Select>
+                      </Col>
+                      <Col>
+                        <Select
+                          placeholder="All Output Mints"
+                          onChange={value => handleFilterChange(value, 'outputMint')}
+                          style={{ width: 150 }}
+                          allowClear
+                        >
+                          <Option value="">All Output Mints</Option>
+                          {outputMints.map(mint => (
+                            <Option key={mint} value={mint}>{mint}</Option>
+                          ))}
+                        </Select>
+                      </Col>
+                    </Row>
+                  ),
+                }}
+                items={tabItems}
               />
             </Col>
-            <Col xs={24} sm={12} md={12} lg={8} xl={8}>
-              <Select
-                placeholder="All Input Mints"
-                onChange={value => handleFilterChange(value, 'inputMint')}
-                style={{ width: '100%' }}
-                allowClear
-              >
-                <Option value="">All Input Mints</Option>
-                {inputMints.map(mint => (
-                  <Option key={mint} value={mint}>{mint}</Option>
-                ))}
-              </Select>
-            </Col>
-            <Col xs={24} sm={12} md={12} lg={8} xl={8}>
-              <Select
-                placeholder="All Output Mints"
-                onChange={value => handleFilterChange(value, 'outputMint')}
-                style={{ width: '100%' }}
-                allowClear
-              >
-                <Option value="">All Output Mints</Option>
-                {outputMints.map(mint => (
-                  <Option key={mint} value={mint}>{mint}</Option>
-                ))}
-              </Select>
-            </Col>
           </Row>
-        </Card>
-
-        <Card className="tabs-card">
-          <Tabs
-            activeKey={activeTab}
-            onChange={(key) => setActiveTab(key as 'Next Hour' | 'Next Day' | 'All')}
-            type="card"
-            className="custom-tabs"
-            items={tabItems}
-          />
         </Card>
       </div>
     </ConfigProvider>
