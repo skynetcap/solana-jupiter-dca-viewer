@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -16,11 +16,6 @@ import type { SortOrder } from 'antd/es/table/interface';
 import debounce from 'lodash.debounce';
 import './JupiterDCAViewer.css';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
-
-const { TabPane } = Tabs;
-const { Option } = Select;
-
 /**
  * Represents a DCA (Dollar Cost Averaging) order.
  */
@@ -34,7 +29,6 @@ type DCAOrder = {
   createdAt: string;
   executeAt: string;
 };
-
 
 /**
  * Represents the structure of chart data.
@@ -53,10 +47,14 @@ type ChartDataType = {
  * Represents the sorting configuration.
  */
 type SortConfig = {
-  key: keyof DCAOrder;
+  key: keyof DCAOrder | 'tokenPair'; // Include 'tokenPair' as a valid key
   direction: SortOrder;
 };
 
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+
+const { TabPane } = Tabs;
+const { Option } = Select;
 
 /**
  * Fetches DCA orders based on the provided filters.
@@ -67,7 +65,8 @@ const fetchDCAOrders = async (filters: any): Promise<DCAOrder[]> => {
   // Simulated API call
   await new Promise(resolve => setTimeout(resolve, 500));
   const now = new Date();
-  
+  console.log("GETDCAORDERS", filters);
+
   return Array(100)
     .fill(null)
     .map((_, index) => {
@@ -98,7 +97,6 @@ const fetchDCAOrders = async (filters: any): Promise<DCAOrder[]> => {
     });
 };
 
-
 /**
  * JupiterDCAViewer component for displaying and managing DCA orders.
  */
@@ -115,7 +113,6 @@ export default function JupiterDCAViewer() {
     direction: 'descend',
   });
 
-
   const [inputMints, setInputMints] = useState<string[]>([]);
   const [outputMints, setOutputMints] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'Next Hour' | 'Next Day' | 'All'>('Next Hour');
@@ -123,6 +120,8 @@ export default function JupiterDCAViewer() {
     labels: [],
     datasets: [],
   });
+
+  const hasFetched = useRef(false);
 
   const fetchAggregateUSDCValue = useCallback(async (orders: DCAOrder[]): Promise<ChartDataType> => {
     const now = new Date();
@@ -169,11 +168,12 @@ export default function JupiterDCAViewer() {
     setOrders(fetchedOrders);
   }, [filters]);
 
-
   useEffect(() => {
-    fetchOrders();
+    if (!hasFetched.current) {
+      fetchOrders();
+      hasFetched.current = true;
+    }
   }, [fetchOrders]);
-
 
   useEffect(() => {
     const uniqueInputMints = Array.from(new Set(orders.map(order => order.inputMint))).sort();
@@ -198,7 +198,6 @@ export default function JupiterDCAViewer() {
       }
     });
 
-
     return relevantOrders
       .filter(order =>
         order.user.toLowerCase().includes(filters.user.toLowerCase()) &&
@@ -209,6 +208,13 @@ export default function JupiterDCAViewer() {
           order.outputMint.toLowerCase().includes(filters.search.toLowerCase()))
       )
       .sort((a, b) => {
+        if (sortConfig.key === 'tokenPair') {
+          const pairA = `${a.outputMint}-${a.inputMint}`;
+          const pairB = `${b.outputMint}-${b.inputMint}`;
+          return sortConfig.direction === 'ascend'
+            ? pairA.localeCompare(pairB)
+            : pairB.localeCompare(pairA);
+        }
         if (sortConfig.direction === 'ascend') {
           return a[sortConfig.key] < b[sortConfig.key] ? -1 : 1;
         }
@@ -220,13 +226,21 @@ export default function JupiterDCAViewer() {
   }, [orders, filters, sortConfig, activeTab]);
 
   /**
-   * Handles changes in filter inputs with debouncing.
-   * @param value - The input value.
-   * @param field - The field to update.
+   * Memoized debounced filter change handler to prevent multiple state updates.
    */
-  const handleFilterChange = debounce((value: string, field: string) => {
-    setFilters(prev => ({ ...prev, [field]: value }));
-  }, 300);
+  const handleFilterChange = useMemo(
+    () =>
+      debounce((value: string, field: string) => {
+        setFilters(prev => ({ ...prev, [field]: value }));
+      }, 300),
+    []
+  );
+
+  useEffect(() => {
+    return () => {
+      handleFilterChange.cancel();
+    };
+  }, [handleFilterChange]);
 
   /**
    * Sets up the aggregate volume chart with periodic updates.
@@ -237,13 +251,11 @@ export default function JupiterDCAViewer() {
       setAggregateChartData(data);
     };
 
-
     loadAggregateData();
     const interval = setInterval(loadAggregateData, 60000); // Update every minute
 
     return () => clearInterval(interval);
   }, [orders, fetchAggregateUSDCValue]);
-
 
   const chartOptions = useMemo(() => ({
     responsive: true,
@@ -288,18 +300,11 @@ export default function JupiterDCAViewer() {
         sortOrder: sortConfig.key === 'user' ? sortConfig.direction : undefined,
       },
       {
-        title: 'Input Mint',
-        dataIndex: 'inputMint',
-        key: 'inputMint',
+        title: 'Token Pair',
+        key: 'tokenPair',
         sorter: true,
-        sortOrder: sortConfig.key === 'inputMint' ? sortConfig.direction : undefined,
-      },
-      {
-        title: 'Output Mint',
-        dataIndex: 'outputMint',
-        key: 'outputMint',
-        sorter: true,
-        sortOrder: sortConfig.key === 'outputMint' ? sortConfig.direction : undefined,
+        sortOrder: sortConfig.key === 'tokenPair' ? sortConfig.direction : undefined,
+        render: (_text, record) => `${record.outputMint}-${record.inputMint}`,
       },
       {
         title: 'Amount',
@@ -335,7 +340,6 @@ export default function JupiterDCAViewer() {
     ],
     [sortConfig]
   );
-
 
   return (
     <ConfigProvider
